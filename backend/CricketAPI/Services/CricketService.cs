@@ -12,6 +12,13 @@ namespace CricketAPI.Services
     {
         private readonly HttpClient _httpClient;
         private readonly ILogger<CricketService> _logger;
+        private const string API_KEY = "30095090-1180-443f-a843-c7ba083f86a6";
+        private const string BASE_URL = "https://api.cricapi.com/v1";
+
+        private static readonly JsonSerializerOptions JsonOptions = new()
+        {
+            PropertyNameCaseInsensitive = true
+        };
 
         public CricketService(HttpClient httpClient, ILogger<CricketService> logger)
         {
@@ -23,52 +30,66 @@ namespace CricketAPI.Services
         {
             try
             {
-                // Simulate dynamic scores for demo
-                var random = new Random();
-                var currentTime = DateTime.Now;
-                
-                var mockMatches = new List<CricketMatch>
+                var response = await _httpClient.GetAsync($"{BASE_URL}/currentMatches?apikey={API_KEY}&offset=0");
+
+                if (!response.IsSuccessStatusCode)
                 {
-                    new CricketMatch
+                    _logger.LogError("CricAPI returned status: {Status}", response.StatusCode);
+                    return new MatchListResponse { Success = false, Message = "Failed to fetch from cricket API" };
+                }
+
+                var json = await response.Content.ReadAsStringAsync();
+                var apiResponse = JsonSerializer.Deserialize<CricApiResponse>(json, JsonOptions);
+
+                if (apiResponse?.Data == null)
+                {
+                    return new MatchListResponse { Success = false, Message = "No data from cricket API" };
+                }
+
+                var matches = apiResponse.Data.Select(m =>
+                {
+                    var scoreText = BuildScoreText(m.Score);
+                    var team1Img = m.TeamInfo?.ElementAtOrDefault(0)?.Img;
+                    var team2Img = m.TeamInfo?.ElementAtOrDefault(1)?.Img;
+
+                    return new CricketMatch
                     {
-                        MatchId = "1",
-                        Team1 = "India",
-                        Team2 = "Australia",
-                        Status = "Live",
-                        Score = $"IND {245 + random.Next(0, 20)}/{4 + random.Next(0, 3)} ({45 + random.Next(0, 5)}.{random.Next(0, 6)}) vs AUS {198 + random.Next(0, 30)}/{8 + random.Next(0, 2)} ({40 + random.Next(0, 8)}.{random.Next(0, 6)})",
-                        MatchType = "ODI",
-                        StartTime = currentTime.AddHours(-2),
-                        Venue = "Melbourne Cricket Ground"
-                    },
-                    new CricketMatch
-                    {
-                        MatchId = "2",
-                        Team1 = "England",
-                        Team2 = "Pakistan",
-                        Status = "Upcoming",
-                        Score = "Match starts in 2 hours",
-                        MatchType = "T20",
-                        StartTime = currentTime.AddHours(2),
-                        Venue = "Lord's Cricket Ground"
-                    }
-                };
+                        MatchId = m.Id,
+                        Name = m.Name,
+                        Team1 = m.Teams?.ElementAtOrDefault(0) ?? "TBD",
+                        Team2 = m.Teams?.ElementAtOrDefault(1) ?? "TBD",
+                        Team1Img = team1Img,
+                        Team2Img = team2Img,
+                        Status = m.Status ?? "Unknown",
+                        Score = scoreText,
+                        MatchType = m.MatchType?.ToUpper() ?? "N/A",
+                        StartTime = DateTime.TryParse(m.DateTimeGMT, out var dt) ? dt : null,
+                        Venue = m.Venue,
+                        MatchStarted = m.MatchStarted,
+                        MatchEnded = m.MatchEnded
+                    };
+                }).ToList();
 
                 return new MatchListResponse
                 {
-                    Matches = mockMatches,
+                    Matches = matches,
                     Success = true,
-                    Message = "Live data retrieved successfully"
+                    Message = $"Retrieved {matches.Count} matches"
                 };
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error fetching cricket matches");
-                return new MatchListResponse
-                {
-                    Success = false,
-                    Message = $"Error: {ex.Message}"
-                };
+                return new MatchListResponse { Success = false, Message = $"Error: {ex.Message}" };
             }
+        }
+
+        private static string BuildScoreText(List<CricApiScore>? scores)
+        {
+            if (scores == null || scores.Count == 0)
+                return "Score not available";
+
+            return string.Join(" | ", scores.Select(s => $"{s.Inning}: {s.R}/{s.W} ({s.O} ov)"));
         }
     }
 }
