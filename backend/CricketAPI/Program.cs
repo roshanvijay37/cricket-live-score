@@ -14,9 +14,27 @@ builder.Services.AddHttpClient();
 var redisUrl = Environment.GetEnvironmentVariable("REDIS_URL");
 if (!string.IsNullOrEmpty(redisUrl))
 {
-    var options = ConfigurationOptions.Parse(redisUrl);
-    options.AbortOnConnectFail = false;
-    builder.Services.AddSingleton<IConnectionMultiplexer>(ConnectionMultiplexer.Connect(options));
+    try
+    {
+        // Parse redis:// URL format from Railway
+        var uri = new Uri(redisUrl);
+        var host = uri.Host;
+        var port2 = uri.Port;
+        var password = uri.UserInfo.Split(':').ElementAtOrDefault(1);
+
+        var options = new ConfigurationOptions
+        {
+            EndPoints = { $"{host}:{port2}" },
+            Password = password,
+            AbortOnConnectFail = false,
+            ConnectTimeout = 5000
+        };
+        builder.Services.AddSingleton<IConnectionMultiplexer>(ConnectionMultiplexer.Connect(options));
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Redis connection failed: {ex.Message}");
+    }
 }
 
 // Register cricket service
