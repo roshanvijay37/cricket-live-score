@@ -1,4 +1,5 @@
 using CricketAPI.Services;
+using StackExchange.Redis;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -8,6 +9,15 @@ builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
 // Add services to the container
 builder.Services.AddControllers();
 builder.Services.AddHttpClient();
+
+// Register Redis
+var redisUrl = Environment.GetEnvironmentVariable("REDIS_URL");
+if (!string.IsNullOrEmpty(redisUrl))
+{
+    var options = ConfigurationOptions.Parse(redisUrl);
+    options.AbortOnConnectFail = false;
+    builder.Services.AddSingleton<IConnectionMultiplexer>(ConnectionMultiplexer.Connect(options));
+}
 
 // Register cricket service
 builder.Services.AddScoped<ICricketService, CricketService>();
