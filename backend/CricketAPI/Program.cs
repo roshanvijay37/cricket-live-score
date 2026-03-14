@@ -4,7 +4,6 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container
 builder.Services.AddControllers();
-builder.Services.AddOpenApi();
 builder.Services.AddHttpClient();
 
 // Register cricket service
@@ -22,12 +21,6 @@ builder.Services.AddCors(options =>
 });
 
 var app = builder.Build();
-
-// Configure the HTTP request pipeline
-if (app.Environment.IsDevelopment())
-{
-    app.MapOpenApi();
-}
 
 // Use port from environment variable or default
 var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
