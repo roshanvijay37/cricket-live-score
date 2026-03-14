@@ -3,3 +3,51 @@
   min-height: 100vh;
   padding: 20px 0;
 }
+
+.install-banner {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: #1a5632;
+  color: white;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  z-index: 1000;
+  box-shadow: 0 -2px 10px rgba(0,0,0,0.2);
+  font-size: 0.95rem;
+}
+
+.install-btn {
+  background: white;
+  color: #1a5632;
+  border: none;
+  padding: 8px 20px;
+  border-radius: 20px;
+  font-weight: bold;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.install-btn:hover {
+  background: #e8e8e8;
+}
+
+.dismiss-btn {
+  background: none;
+  border: none;
+  color: white;
+  font-size: 1.2rem;
+  cursor: pointer;
+  padding: 4px 8px;
+}
+
+@media (max-width: 768px) {
+  .install-banner {
+    font-size: 0.85rem;
+    padding: 10px 12px;
+  }
+}
