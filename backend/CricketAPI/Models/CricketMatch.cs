@@ -15,6 +15,17 @@ namespace CricketAPI.Models
         public string? Venue { get; set; }
         public bool MatchStarted { get; set; }
         public bool MatchEnded { get; set; }
+        public string? TossWinner { get; set; }
+        public string? TossChoice { get; set; }
+        public List<ScoreDetail>? ScoreDetails { get; set; }
+    }
+
+    public class ScoreDetail
+    {
+        public string? Inning { get; set; }
+        public int Runs { get; set; }
+        public int Wickets { get; set; }
+        public double Overs { get; set; }
     }
 
     public class MatchListResponse
@@ -24,10 +35,23 @@ namespace CricketAPI.Models
         public string? Message { get; set; }
     }
 
+    public class MatchDetailResponse
+    {
+        public CricketMatch? Match { get; set; }
+        public bool Success { get; set; }
+        public string? Message { get; set; }
+    }
+
     // Models to deserialize CricAPI response
     public class CricApiResponse
     {
         public List<CricApiMatch>? Data { get; set; }
+        public string? Status { get; set; }
+    }
+
+    public class CricApiSingleResponse
+    {
+        public CricApiMatch? Data { get; set; }
         public string? Status { get; set; }
     }
 
@@ -44,6 +68,8 @@ namespace CricketAPI.Models
         public List<CricApiScore>? Score { get; set; }
         public bool MatchStarted { get; set; }
         public bool MatchEnded { get; set; }
+        public string? TossWinner { get; set; }
+        public string? TossChoice { get; set; }
     }
 
     public class CricApiTeamInfo

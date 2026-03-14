@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import CricketMatches from './CricketMatches';
+import MatchDetail from './MatchDetail';
 import './App.css';
 
 function App() {
+  const [selectedMatchId, setSelectedMatchId] = useState(null);
   const [installPrompt, setInstallPrompt] = useState(null);
   const [showInstall, setShowInstall] = useState(false);
 
@@ -20,9 +22,7 @@ function App() {
     if (!installPrompt) return;
     installPrompt.prompt();
     const result = await installPrompt.userChoice;
-    if (result.outcome === 'accepted') {
-      setShowInstall(false);
-    }
+    if (result.outcome === 'accepted') setShowInstall(false);
     setInstallPrompt(null);
   };
 
@@ -35,7 +35,12 @@ function App() {
           <button onClick={() => setShowInstall(false)} className="dismiss-btn">✕</button>
         </div>
       )}
-      <CricketMatches />
+
+      {selectedMatchId ? (
+        <MatchDetail matchId={selectedMatchId} onBack={() => setSelectedMatchId(null)} />
+      ) : (
+        <CricketMatches onMatchClick={(id) => setSelectedMatchId(id)} />
+      )}
     </div>
   );
 }

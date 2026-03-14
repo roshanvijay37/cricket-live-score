@@ -20,26 +20,15 @@ namespace CricketAPI.Controllers
         [HttpGet("matches")]
         public async Task<ActionResult<MatchListResponse>> GetLiveMatches()
         {
-            try
-            {
-                var result = await _cricketService.GetLiveMatchesAsync();
-                
-                if (result.Success)
-                {
-                    return Ok(result);
-                }
-                
-                return BadRequest(result);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error in GetLiveMatches endpoint");
-                return StatusCode(500, new MatchListResponse 
-                { 
-                    Success = false, 
-                    Message = "Internal server error" 
-                });
-            }
+            var result = await _cricketService.GetLiveMatchesAsync();
+            return result.Success ? Ok(result) : BadRequest(result);
+        }
+
+        [HttpGet("matches/{id}")]
+        public async Task<ActionResult<MatchDetailResponse>> GetMatchDetail(string id)
+        {
+            var result = await _cricketService.GetMatchDetailAsync(id);
+            return result.Success ? Ok(result) : BadRequest(result);
         }
 
         [HttpGet("health")]

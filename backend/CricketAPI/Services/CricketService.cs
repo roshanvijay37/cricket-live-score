@@ -7,6 +7,7 @@ namespace CricketAPI.Services
     public interface ICricketService
     {
         Task<MatchListResponse> GetLiveMatchesAsync();
+        Task<MatchDetailResponse> GetMatchDetailAsync(string matchId);
     }
 
     public class CricketService : ICricketService
@@ -63,10 +64,7 @@ namespace CricketAPI.Services
                 var response = await _httpClient.GetAsync($"{BASE_URL}/currentMatches?apikey={API_KEY}&offset=0");
 
                 if (!response.IsSuccessStatusCode)
-                {
-                    _logger.LogError("CricAPI returned status: {Status}", response.StatusCode);
                     return new MatchListResponse { Success = false, Message = "Failed to fetch from cricket API" };
-                }
 
                 var json = await response.Content.ReadAsStringAsync();
                 var apiResponse = JsonSerializer.Deserialize<CricApiResponse>(json, JsonOptions);
@@ -74,26 +72,7 @@ namespace CricketAPI.Services
                 if (apiResponse?.Data == null)
                     return new MatchListResponse { Success = false, Message = "No data from cricket API" };
 
-                var matches = apiResponse.Data.Select(m =>
-                {
-                    var scoreText = BuildScoreText(m.Score);
-                    return new CricketMatch
-                    {
-                        MatchId = m.Id,
-                        Name = m.Name,
-                        Team1 = m.Teams?.ElementAtOrDefault(0) ?? "TBD",
-                        Team2 = m.Teams?.ElementAtOrDefault(1) ?? "TBD",
-                        Team1Img = m.TeamInfo?.ElementAtOrDefault(0)?.Img,
-                        Team2Img = m.TeamInfo?.ElementAtOrDefault(1)?.Img,
-                        Status = m.Status ?? "Unknown",
-                        Score = scoreText,
-                        MatchType = m.MatchType?.ToUpper() ?? "N/A",
-                        StartTime = DateTime.TryParse(m.DateTimeGMT, out var dt) ? dt : null,
-                        Venue = m.Venue,
-                        MatchStarted = m.MatchStarted,
-                        MatchEnded = m.MatchEnded
-                    };
-                }).ToList();
+                var matches = apiResponse.Data.Select(MapToMatch).ToList();
 
                 var result = new MatchListResponse
                 {
@@ -110,7 +89,6 @@ namespace CricketAPI.Services
                         var db = _redis.GetDatabase();
                         var cacheJson = JsonSerializer.Serialize(result, JsonOptions);
                         await db.StringSetAsync(CACHE_KEY, cacheJson, TimeSpan.FromMinutes(CACHE_MINUTES));
-                        _logger.LogInformation("Match data cached for {Minutes} minutes", CACHE_MINUTES);
                     }
                 }
                 catch (Exception ex)
@@ -125,6 +103,107 @@ namespace CricketAPI.Services
                 _logger.LogError(ex, "Error fetching cricket matches");
                 return new MatchListResponse { Success = false, Message = $"Error: {ex.Message}" };
             }
+        }
+
+        public async Task<MatchDetailResponse> GetMatchDetailAsync(string matchId)
+        {
+            // Try cache first
+            var cacheKey = $"cricket:match:{matchId}";
+            try
+            {
+                if (_redis != null)
+                {
+                    var db = _redis.GetDatabase();
+                    var cached = await db.StringGetAsync(cacheKey);
+                    if (cached.HasValue)
+                    {
+                        var cachedResponse = JsonSerializer.Deserialize<MatchDetailResponse>(cached!, JsonOptions);
+                        if (cachedResponse != null)
+                        {
+                            cachedResponse.Message = "From cache";
+                            return cachedResponse;
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Redis cache read failed for match detail");
+            }
+
+            try
+            {
+                var response = await _httpClient.GetAsync($"{BASE_URL}/match_info?apikey={API_KEY}&id={matchId}");
+
+                if (!response.IsSuccessStatusCode)
+                    return new MatchDetailResponse { Success = false, Message = "Failed to fetch match details" };
+
+                var json = await response.Content.ReadAsStringAsync();
+                var apiResponse = JsonSerializer.Deserialize<CricApiSingleResponse>(json, JsonOptions);
+
+                if (apiResponse?.Data == null)
+                    return new MatchDetailResponse { Success = false, Message = "Match not found" };
+
+                var match = MapToMatch(apiResponse.Data);
+
+                var result = new MatchDetailResponse
+                {
+                    Match = match,
+                    Success = true,
+                    Message = "Match details retrieved"
+                };
+
+                // Cache for 3 minutes
+                try
+                {
+                    if (_redis != null)
+                    {
+                        var db = _redis.GetDatabase();
+                        var cacheJson = JsonSerializer.Serialize(result, JsonOptions);
+                        await db.StringSetAsync(cacheKey, cacheJson, TimeSpan.FromMinutes(3));
+                    }
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Redis cache write failed for match detail");
+                }
+
+                return result;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error fetching match detail");
+                return new MatchDetailResponse { Success = false, Message = $"Error: {ex.Message}" };
+            }
+        }
+
+        private static CricketMatch MapToMatch(CricApiMatch m)
+        {
+            return new CricketMatch
+            {
+                MatchId = m.Id,
+                Name = m.Name,
+                Team1 = m.Teams?.ElementAtOrDefault(0) ?? "TBD",
+                Team2 = m.Teams?.ElementAtOrDefault(1) ?? "TBD",
+                Team1Img = m.TeamInfo?.ElementAtOrDefault(0)?.Img,
+                Team2Img = m.TeamInfo?.ElementAtOrDefault(1)?.Img,
+                Status = m.Status ?? "Unknown",
+                Score = BuildScoreText(m.Score),
+                MatchType = m.MatchType?.ToUpper() ?? "N/A",
+                StartTime = DateTime.TryParse(m.DateTimeGMT, out var dt) ? dt : null,
+                Venue = m.Venue,
+                MatchStarted = m.MatchStarted,
+                MatchEnded = m.MatchEnded,
+                TossWinner = m.TossWinner,
+                TossChoice = m.TossChoice,
+                ScoreDetails = m.Score?.Select(s => new ScoreDetail
+                {
+                    Inning = s.Inning,
+                    Runs = s.R,
+                    Wickets = s.W,
+                    Overs = s.O
+                }).ToList()
+            };
         }
 
         private static string BuildScoreText(List<CricApiScore>? scores)

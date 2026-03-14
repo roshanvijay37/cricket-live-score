@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import './CricketMatches.css';
 
-const CricketMatches = () => {
+const CricketMatches = ({ onMatchClick }) => {
   const [matches, setMatches] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -113,7 +113,7 @@ const CricketMatches = () => {
           filteredMatches.map((match) => {
             const state = getMatchState(match);
             return (
-              <div key={match.matchId} className={`match-card ${state}`}>
+              <div key={match.matchId} className={`match-card ${state}`} onClick={() => onMatchClick(match.matchId)}>
                 <div className="match-header">
                   <span className="match-status" style={{ backgroundColor: getStatusColor(state) }}>
                     {state.toUpperCase()}
