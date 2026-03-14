@@ -89,7 +89,7 @@ const MatchDetail = ({ matchId, onBack }) => {
 
         <div className="detail-result">{match.status}</div>
 
-        {match.scoreDetails && match.scoreDetails.length > 0 && (
+        {match.scoreDetails && match.scoreDetails.length > 0 ? (
           <div className="scorecard">
             <h3>📊 Scorecard</h3>
             <table>
@@ -112,6 +112,20 @@ const MatchDetail = ({ matchId, onBack }) => {
                 ))}
               </tbody>
             </table>
+          </div>
+        ) : match.score && match.score !== 'Score not available' ? (
+          <div className="scorecard">
+            <h3>📊 Score Summary</h3>
+            <div className="score-summary">
+              {match.score.split(' | ').map((s, i) => (
+                <div key={i} className="score-line">{s}</div>
+              ))}
+            </div>
+          </div>
+        ) : (
+          <div className="scorecard">
+            <h3>📊 Scorecard</h3>
+            <p className="no-score">Score not available yet</p>
           </div>
         )}
 
