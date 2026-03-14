@@ -11,7 +11,7 @@ const CricketMatches = () => {
   const fetchMatches = useCallback(async () => {
     try {
       setLoading(true);
-      const apiUrl = `http://${window.location.hostname}:8080`;
+      const apiUrl = process.env.REACT_APP_API_URL || `http://${window.location.hostname}:8080`;
       const response = await fetch(`${apiUrl}/api/cricket/matches`);
       
       if (!response.ok) {
