@@ -2,6 +2,9 @@ using CricketAPI.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
+var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
+builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
+
 // Add services to the container
 builder.Services.AddControllers();
 builder.Services.AddHttpClient();
@@ -21,10 +24,6 @@ builder.Services.AddCors(options =>
 });
 
 var app = builder.Build();
-
-// Use port from environment variable or default
-var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
-app.Urls.Add($"http://0.0.0.0:{port}");
 
 app.UseCors("AllowFrontend");
 app.MapControllers();
