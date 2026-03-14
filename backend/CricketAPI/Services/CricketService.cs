@@ -34,7 +34,6 @@ namespace CricketAPI.Services
 
         public async Task<MatchListResponse> GetLiveMatchesAsync()
         {
-            // Try cache first
             try
             {
                 if (_redis != null)
@@ -43,7 +42,6 @@ namespace CricketAPI.Services
                     var cached = await db.StringGetAsync(CACHE_KEY);
                     if (cached.HasValue)
                     {
-                        _logger.LogInformation("Returning cached match data");
                         var cachedResponse = JsonSerializer.Deserialize<MatchListResponse>(cached!, JsonOptions);
                         if (cachedResponse != null)
                         {
@@ -55,25 +53,21 @@ namespace CricketAPI.Services
             }
             catch (Exception ex)
             {
-                _logger.LogWarning(ex, "Redis cache read failed, falling back to API");
+                _logger.LogWarning(ex, "Redis cache read failed");
             }
 
-            // Fetch from API
             try
             {
                 var response = await _httpClient.GetAsync($"{BASE_URL}/currentMatches?apikey={API_KEY}&offset=0");
-
                 if (!response.IsSuccessStatusCode)
                     return new MatchListResponse { Success = false, Message = "Failed to fetch from cricket API" };
 
                 var json = await response.Content.ReadAsStringAsync();
                 var apiResponse = JsonSerializer.Deserialize<CricApiResponse>(json, JsonOptions);
-
                 if (apiResponse?.Data == null)
                     return new MatchListResponse { Success = false, Message = "No data from cricket API" };
 
                 var matches = apiResponse.Data.Select(MapToMatch).ToList();
-
                 var result = new MatchListResponse
                 {
                     Matches = matches,
@@ -81,20 +75,15 @@ namespace CricketAPI.Services
                     Message = $"Retrieved {matches.Count} matches (live from API)"
                 };
 
-                // Store in cache
                 try
                 {
                     if (_redis != null)
                     {
                         var db = _redis.GetDatabase();
-                        var cacheJson = JsonSerializer.Serialize(result, JsonOptions);
-                        await db.StringSetAsync(CACHE_KEY, cacheJson, TimeSpan.FromMinutes(CACHE_MINUTES));
+                        await db.StringSetAsync(CACHE_KEY, JsonSerializer.Serialize(result, JsonOptions), TimeSpan.FromMinutes(CACHE_MINUTES));
                     }
                 }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Redis cache write failed");
-                }
+                catch (Exception ex) { _logger.LogWarning(ex, "Redis cache write failed"); }
 
                 return result;
             }
@@ -107,8 +96,7 @@ namespace CricketAPI.Services
 
         public async Task<MatchDetailResponse> GetMatchDetailAsync(string matchId)
         {
-            // Try cache first
-            var cacheKey = $"cricket:match:{matchId}";
+            var cacheKey = $"cricket:match:v2:{matchId}";
             try
             {
                 if (_redis != null)
@@ -126,25 +114,53 @@ namespace CricketAPI.Services
                     }
                 }
             }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Redis cache read failed for match detail");
-            }
+            catch (Exception ex) { _logger.LogWarning(ex, "Redis cache read failed"); }
 
             try
             {
+                // Fetch match info
                 var response = await _httpClient.GetAsync($"{BASE_URL}/match_info?apikey={API_KEY}&id={matchId}");
-
                 if (!response.IsSuccessStatusCode)
                     return new MatchDetailResponse { Success = false, Message = "Failed to fetch match details" };
 
                 var json = await response.Content.ReadAsStringAsync();
                 var apiResponse = JsonSerializer.Deserialize<CricApiSingleResponse>(json, JsonOptions);
-
                 if (apiResponse?.Data == null)
                     return new MatchDetailResponse { Success = false, Message = "Match not found" };
 
                 var match = MapToMatch(apiResponse.Data);
+
+                // Fetch squad if available
+                if (apiResponse.Data.HasSquad)
+                {
+                    try
+                    {
+                        var squadResponse = await _httpClient.GetAsync($"{BASE_URL}/match_squad?apikey={API_KEY}&id={matchId}");
+                        if (squadResponse.IsSuccessStatusCode)
+                        {
+                            var squadJson = await squadResponse.Content.ReadAsStringAsync();
+                            var squadData = JsonSerializer.Deserialize<CricApiSquadResponse>(squadJson, JsonOptions);
+                            if (squadData?.Data != null && squadData.Data.Count > 0)
+                            {
+                                match.Squads = squadData.Data.Select(s => new TeamSquad
+                                {
+                                    TeamName = s.TeamName,
+                                    Shortname = s.Shortname,
+                                    Img = s.Img,
+                                    Players = s.Players?.Select(p => new Player
+                                    {
+                                        Name = p.Name,
+                                        Role = p.Role,
+                                        BattingStyle = p.BattingStyle,
+                                        BowlingStyle = p.BowlingStyle,
+                                        PlayerImg = p.PlayerImg
+                                    }).ToList()
+                                }).ToList();
+                            }
+                        }
+                    }
+                    catch (Exception ex) { _logger.LogWarning(ex, "Failed to fetch squad"); }
+                }
 
                 var result = new MatchDetailResponse
                 {
@@ -153,20 +169,15 @@ namespace CricketAPI.Services
                     Message = "Match details retrieved"
                 };
 
-                // Cache for 3 minutes
                 try
                 {
                     if (_redis != null)
                     {
                         var db = _redis.GetDatabase();
-                        var cacheJson = JsonSerializer.Serialize(result, JsonOptions);
-                        await db.StringSetAsync(cacheKey, cacheJson, TimeSpan.FromMinutes(3));
+                        await db.StringSetAsync(cacheKey, JsonSerializer.Serialize(result, JsonOptions), TimeSpan.FromMinutes(3));
                     }
                 }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Redis cache write failed for match detail");
-                }
+                catch (Exception ex) { _logger.LogWarning(ex, "Redis cache write failed"); }
 
                 return result;
             }
@@ -210,7 +221,6 @@ namespace CricketAPI.Services
         {
             if (scores == null || scores.Count == 0)
                 return "Score not available";
-
             return string.Join(" | ", scores.Select(s => $"{s.Inning}: {s.R}/{s.W} ({s.O} ov)"));
         }
     }

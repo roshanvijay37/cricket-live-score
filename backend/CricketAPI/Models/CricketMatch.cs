@@ -18,6 +18,7 @@ namespace CricketAPI.Models
         public string? TossWinner { get; set; }
         public string? TossChoice { get; set; }
         public List<ScoreDetail>? ScoreDetails { get; set; }
+        public List<TeamSquad>? Squads { get; set; }
     }
 
     public class ScoreDetail
@@ -26,6 +27,23 @@ namespace CricketAPI.Models
         public int Runs { get; set; }
         public int Wickets { get; set; }
         public double Overs { get; set; }
+    }
+
+    public class TeamSquad
+    {
+        public string? TeamName { get; set; }
+        public string? Shortname { get; set; }
+        public string? Img { get; set; }
+        public List<Player>? Players { get; set; }
+    }
+
+    public class Player
+    {
+        public string? Name { get; set; }
+        public string? Role { get; set; }
+        public string? BattingStyle { get; set; }
+        public string? BowlingStyle { get; set; }
+        public string? PlayerImg { get; set; }
     }
 
     public class MatchListResponse
@@ -55,6 +73,29 @@ namespace CricketAPI.Models
         public string? Status { get; set; }
     }
 
+    public class CricApiSquadResponse
+    {
+        public List<CricApiSquad>? Data { get; set; }
+        public string? Status { get; set; }
+    }
+
+    public class CricApiSquad
+    {
+        public string? TeamName { get; set; }
+        public string? Shortname { get; set; }
+        public string? Img { get; set; }
+        public List<CricApiPlayer>? Players { get; set; }
+    }
+
+    public class CricApiPlayer
+    {
+        public string? Name { get; set; }
+        public string? Role { get; set; }
+        public string? BattingStyle { get; set; }
+        public string? BowlingStyle { get; set; }
+        public string? PlayerImg { get; set; }
+    }
+
     public class CricApiMatch
     {
         public string? Id { get; set; }
@@ -70,6 +111,7 @@ namespace CricketAPI.Models
         public bool MatchEnded { get; set; }
         public string? TossWinner { get; set; }
         public string? TossChoice { get; set; }
+        public bool HasSquad { get; set; }
     }
 
     public class CricApiTeamInfo
