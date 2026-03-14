@@ -1,0 +1,10 @@
+# .NET
+backend/CricketAPI/bin/
+backend/CricketAPI/obj/
+
+# React
+frontend/cricket-app/node_modules/
+frontend/cricket-app/build/
+
+# Environment
+frontend/cricket-app/.env
